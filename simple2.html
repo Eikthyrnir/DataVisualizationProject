@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <title>Mapa Województw Polski – Interaktywna</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style> #map { height: 100vh; width: 100vw; } </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    var map = L.map('map', {
+      center: [52.1, 19.4],
+      zoom: 6,
+      zoomControl: false,
+      attributionControl: false
+    });
+
+    let gminyData = null;       
+    let gminyLayer = null;      
+    let powiatyData = null;     
+    let powiatyLayer = null;    
+    let wojewodztwaLayer = null;
+
+    fetch('contours_data/WGS84/powiaty.json')
+      .then(res => res.json())
+      .then(data => {
+        powiatyData = data;
+      });
+
+    fetch('contours_data/WGS84/gminy.json')
+      .then(res => res.json())
+      .then(data => {
+        gminyData = data;
+      });
+
+    fetch('contours_data/pol_admbnda_adm1_gov_v02_20220414.json')
+      .then(res => res.json())
+      .then(data => {
+        function highlightFeature(e) {
+          var layer = e.target;
+          layer.setStyle({
+            fillColor: "#FFEE88",
+            fillOpacity: 0.7
+          });
+        }
+
+        function resetHighlight(e) {
+          wojewodztwaLayer.resetStyle(e.target);
+        }
+
+        function zoomToFeature(e) {
+          var woj = e.target.feature;
+          map.fitBounds(e.target.getBounds());
+
+          console.log(woj.properties.ADM1_PL)
+
+          // Очищаем старый слой powiatów
+          if (powiatyLayer) {
+            map.removeLayer(powiatyLayer);
+          }
+
+          // Фильтруем powiaty, принадлежащие этому województwu
+          // Зависит от вашей структуры geojson! 
+          // Например, если поле 'wojewodztwo_id' или TERYT
+          const wojId = woj.properties.ADM1_PCODE
+          const filteredPowiaty = {
+            ...powiatyData,
+            features: powiatyData.features.filter(f =>
+              // например, если powiat.properties.wojewodztwo_id == wojId
+              (f.properties.JPT_KOD_JE.startsWith(wojId.substring(3)))    // замените на ваше реальное имя поля
+            )
+          };
+
+          powiatyLayer = L.geoJson(filteredPowiaty, {
+            style: {
+              color: "#0066cc",
+              weight: 1.5,
+              fillColor: "#aad3df",
+              fillOpacity: 0.6
+            },
+            onEachFeature: function(feature, layer) {
+              layer.on({
+                mouseover: function(e){
+                  e.target.setStyle({
+                    fillColor: "#fcb900",
+                    fillOpacity: 0.8
+                  });
+                },
+                mouseout: function(e){
+                  powiatyLayer.resetStyle(e.target);
+                },
+                click: function(e){
+                  map.fitBounds(e.target.getBounds());
+                  console.log("Wybrano powiat: " + e.target.feature.properties.JPT_NAZWA_);
+                }
+              });
+            }
+          }).addTo(map);
+        }
+
+        function onEachFeature(feature, layer) {
+          layer.on({
+            mouseover: highlightFeature,
+            mouseout: resetHighlight,
+            click: zoomToFeature
+          });
+        }
+
+        wojewodztwaLayer = L.geoJson(data, {
+          style: {
+            color: "#999",
+            weight: 1.5,
+            fillColor: "#dddddd",
+            fillOpacity: 0.6
+          },
+          onEachFeature: onEachFeature
+        }).addTo(map);
+      });
+  </script>
+</body>
+</html>
