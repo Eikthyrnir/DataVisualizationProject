@@ -54,7 +54,7 @@
   <div class="container">
     <div id="sidebar">
       <h2 id="region-title">Wybierz region</h2>
-      <select id="wojewodztwoSelect"></select>
+      <select id="regionSelect"></select>
       <canvas id="barplot" height="320"></canvas>
       <canvas id="pieplot" height="320"></canvas>
     </div>
@@ -76,7 +76,7 @@
     let pieChart = null;
 
     // 1. Загружаем CSV
-    Papa.parse('raw_data/tura_1/wyniki_gl_na_kandydatow_po_wojewodztwach_utf8.csv', {
+    Papa.parse('raw_data/tura_1/wyniki_gl_na_kandydatow_po_gminach_utf8.csv', {
       download: true,
       header: true,
       delimiter: ';',
@@ -84,7 +84,7 @@
         wyniki = results.data.filter(row => row.Województwo); // пропускаем пустые строки
         // заполняем селектор воеводств
         const wojSet = new Set(wyniki.map(r=>r.Województwo));
-        const select = document.getElementById('wojewodztwoSelect');
+        const select = document.getElementById('regionSelect');
         select.innerHTML = `<option value="__ALL__">Cała Polska</option>` +
           Array.from(wojSet).map(w => `<option value="${w}">${w}</option>`).join('');
         select.addEventListener('change', ()=>plotForRegion(select.value));
@@ -181,8 +181,17 @@
     }
 
     // 2. Карта
+    function getRegionId(region) {
+      return region.JPT_KOD_JE 
+          || selectedRegion.ADM1_PCODE.substring(3);
+    }
+
     function getRegionName(props) {
       return props.nazwa || props.JPT_NAZWA_ || props.ADM1_PL;
+    }
+
+    function getSubregionsData(selectedRegionType) {
+      return selectedRegionType == 'woj' ? regionData['powiat'] : regionData['gmina'];
     }
 
     var map = L.map('map', {
@@ -192,29 +201,38 @@
       attributionControl: false
     });
 
-    let gminyData = null;       
-    let gminyLayer = null;      
-    let powiatyData = null;     
-    let powiatyLayer = null;    
-    let wojewodztwaLayer = null;
+    let layers = {
+      woj: null,
+      powiat: null,
+      gmina: null,
+    }
+
+    let regionData = {
+      woj: null,
+      powiat: null,
+      gmina: null,
+    }
 
     let selectedRegion = null;
+    let selectedRegionType = null;
 
     fetch('contours_data/WGS84/powiaty.json')
       .then(res => res.json())
       .then(data => {
-        powiatyData = data;
+        regionData['powiat'] = data;
       });
 
     fetch('contours_data/WGS84/gminy.json')
       .then(res => res.json())
       .then(data => {
-        gminyData = data;
+        regionData['gmina'] = data;
       });
 
     fetch('contours_data/pol_admbnda_adm1_gov_v02_20220414.json')
       .then(res => res.json())
       .then(data => {
+        regionData['woj'] = data;
+
         function highlightFeature(e) {
           var layer = e.target;
           layer.setStyle({
@@ -247,18 +265,23 @@
 
         function zoomToFeature(e) {
           selectedRegion = e.target.feature.properties;
+          selectedRegionType = selectedRegion.RODZAJ || 'woj'
           map.fitBounds(e.target.getBounds());
 
-          if (powiatyLayer) {
-            map.removeLayer(powiatyLayer);
-          }
-          if (gminyLayer) {
-            map.removeLayer(gminyLayer);
-          }
+          // Select in dropdown:
+          const select = document.getElementById('regionSelect');
+          select.value = getRegionName(selectedRegion).toLowerCase();
+          select.dispatchEvent(new Event('change'));
 
-          const selectedRegionId = selectedRegion.JPT_KOD_JE 
-              || selectedRegion.ADM1_PCODE.substring(3);
-          const subregionsData = selectedRegionId.length == 2 ? powiatyData : gminyData;
+          if (layers['powiat']) {
+            map.removeLayer(layers['powiat']);
+          }
+          if (layers['gmina']) {
+            map.removeLayer(layers['gmina']);
+          }
+          
+          const subregionsData = getSubregionsData(selectedRegionType)
+          const selectedRegionId = getRegionId(selectedRegion)
           const filteredSubregions = {
             ...subregionsData,
             features: subregionsData.features.filter(f =>
@@ -280,24 +303,20 @@
                 click: zoomToFeature
               });
             }
-          }).addTo(map);;
+          }).addTo(map);
 
-          if (selectedRegionId.length == 2) {
-            powiatyLayer = nextLayer;
-          } else {
-            gminyLayer = nextLayer;
-          }
+          layers[selectedRegionType] = nextLayer;
         }
 
         function onEachFeature(feature, layer) {
           layer.on({
             mouseover: highlightFeature,
-            mouseout: (e) => resetHighlight(e, wojewodztwaLayer),
+            mouseout: (e) => resetHighlight(e, layers['woj']),
             click: zoomToFeature
           });
         }
 
-        wojewodztwaLayer = L.geoJson(data, {
+        layers['woj'] = L.geoJson(data, {
           style: {
             color: "#999",
             weight: 1.5,
