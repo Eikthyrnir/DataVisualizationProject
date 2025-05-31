@@ -87,6 +87,10 @@
       });
     }
 
+    function getRegionName(props) {
+      return props.nazwa || props.JPT_NAZWA_ || props.ADM1_PL;
+    }
+
     // 2. Карта
     var map = L.map('map', {
       center: [52.1, 19.4],
@@ -100,6 +104,8 @@
     let powiatyData = null;     
     let powiatyLayer = null;    
     let wojewodztwaLayer = null;
+
+    let selectedRegion = null;
 
     fetch('contours_data/WGS84/powiaty.json')
       .then(res => res.json())
@@ -130,7 +136,7 @@
 
           // Add custom tooltip at center
           layer.bindTooltip(
-            props.nazwa || props.JPT_NAZWA_ || props.ADM1_PL,
+            getRegionName(props),
             {
               permanent: true,
               direction: 'center',
@@ -147,7 +153,7 @@
         }
 
         function zoomToFeature(e) {
-          var selectedRegion = e.target.feature;
+          selectedRegion = e.target.feature.properties;
           map.fitBounds(e.target.getBounds());
 
           if (powiatyLayer) {
@@ -157,8 +163,8 @@
             map.removeLayer(gminyLayer);
           }
 
-          const selectedRegionId = selectedRegion.properties.JPT_KOD_JE 
-              || selectedRegion.properties.ADM1_PCODE.substring(3);
+          const selectedRegionId = selectedRegion.JPT_KOD_JE 
+              || selectedRegion.ADM1_PCODE.substring(3);
           const subregionsData = selectedRegionId.length == 2 ? powiatyData : gminyData;
           const filteredSubregions = {
             ...subregionsData,
@@ -190,17 +196,15 @@
           }
 
           // ------ !!! Barplot demo !!! -------
-          const props = woj.properties;
           showBarplot(
-            props.nazwa || props.name || "Województwo",
+            getRegionName(selectedRegion),
             {
               labels: ["Kandydat A", "Kandydat B", "Kandydat C", "Inni", "Frekwencja (%)"],
               values: [
-                props.kandA || Math.round(Math.random()*1000000),
-                props.kandB || Math.round(Math.random()*1000000),
-                props.kandC || Math.round(Math.random()*1000000),
-                props.inni  || Math.round(Math.random()*100000),
-                props.frekwencja || (40 + Math.round(Math.random()*30))
+                selectedRegion.kandA || Math.round(Math.random()*1000000),
+                selectedRegion.kandB || Math.round(Math.random()*1000000),
+                selectedRegion.kandC || Math.round(Math.random()*1000000),
+                selectedRegion.inni  || Math.round(Math.random()*100000)
               ]
             }
           );
