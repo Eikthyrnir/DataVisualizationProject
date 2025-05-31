@@ -53,8 +53,18 @@
 <body>
   <div class="container">
     <div id="sidebar">
-      <h2 id="region-title">Wybierz region</h2>
-      <select id="regionSelect"></select>
+      <div class="select-row">
+        <h2 id="region-title">Wybierz region</h2>
+        <label>Województwo:
+        <select id="wojewodztwoSelect"></select>
+        </label>
+        <label>Powiat:
+          <select id="powiatSelect"></select>
+        </label>
+        <label>Gmina:
+          <select id="gminaSelect"></select>
+        </label>
+      </div>
       <canvas id="barplot" height="320"></canvas>
       <canvas id="pieplot" height="320"></canvas>
     </div>
@@ -75,36 +85,88 @@
     let barChart = null;
     let pieChart = null;
 
+    const regionSelector = {
+      woj: document.getElementById('wojewodztwoSelect'),
+      powiat: document.getElementById('powiatSelect'),
+      gmina: document.getElementById('gminaSelect'),
+    };
+
+    function getColumnName(regionType) {
+      switch (regionType) {
+        case 'powiat':
+          return 'Powiat';
+        case 'gmina':
+          return 'Gmina';
+        case 'woj':
+        //fallthrought
+        default:
+          return 'Województwo';
+      }
+    }
+
     // 1. Загружаем CSV
     Papa.parse('raw_data/tura_1/wyniki_gl_na_kandydatow_po_gminach_utf8.csv', {
       download: true,
       header: true,
       delimiter: ';',
       complete: function(results) {
-        wyniki = results.data.filter(row => row.Województwo); // пропускаем пустые строки
-        // заполняем селектор воеводств
-        const wojSet = new Set(wyniki.map(r=>r.Województwo));
-        const select = document.getElementById('regionSelect');
-        select.innerHTML = `<option value="__ALL__">Cała Polska</option>` +
-          Array.from(wojSet).map(w => `<option value="${w}">${w}</option>`).join('');
-        select.addEventListener('change', ()=>plotForRegion(select.value));
-        plotForRegion('__ALL__');
+        wyniki = results.data.filter(row => row.Województwo); // REMOVE EMPTY LINES
+        
+        fillWojewodztwa();
+        regionSelector['woj'].addEventListener('change', onWojChange);
+        regionSelector['powiat'].addEventListener('change', onPowiatChange);
+        regionSelector['gmina'].addEventListener('change', plotCurrent);
+
+        plotCurrent();
       }
     });
 
-    // 2. Функция для агрегации по региону
-    function getVotes(region) {
-      let rows = (region === '__ALL__') ? wyniki : wyniki.filter(r=>r.Województwo===region);
-      // Суммируем по кандидатам
-      let votes = candidates.map(cand =>
-        rows.reduce((acc, r) => acc + (parseInt(r[cand].replace(/\s/g,'') || 0)), 0)
-      );
-      return votes;
+    function fillWojewodztwa() {
+      const wojSet = new Set(wyniki.map(r=>r.Województwo));
+      regionSelector['woj'].innerHTML = `<option value="">Cała Polska</option>` +
+        Array.from(wojSet).sort().map(w => `<option value="${w}">${w}</option>`).join('');
+      regionSelector['powiat'].innerHTML = `<option value="">Wszystkie powiaty</option>`;
+      regionSelector['gmina'].innerHTML = `<option value="">Wszystkie gminy</option>`;
     }
 
-    // 3. Строим barplot и pieplot
-    function plotForRegion(region) {
-      let votes = getVotes(region);
+    function onWojChange() {
+      const woj = regionSelector['woj'].value;
+      const powiatSet = new Set(
+        wyniki.filter(r => !woj || r.Województwo === woj)
+              .map(r => r.Powiat).filter(Boolean)
+      );
+      regionSelector['powiat'].innerHTML = `<option value="">Wszystkie powiaty</option>` +
+        Array.from(powiatSet).sort().map(p => `<option value="${p}">${p}</option>`).join('');
+      //clear gminy
+      regionSelector['gmina'].innerHTML = `<option value="">Wszystkie gminy</option>`;
+      plotCurrent();
+    }
+    function onPowiatChange() {
+      const woj = regionSelector['woj'].value;
+      const powiat = regionSelector['powiat'].value;
+      const gminaSet = new Set(
+        wyniki.filter(r =>
+          (!woj || r.Województwo === woj) &&
+          (!powiat || r.Powiat === powiat)
+        ).map(r => r.Gmina).filter(Boolean)
+      );
+      regionSelector['gmina'].innerHTML = `<option value="">Wszystkie gminy</option>` +
+        Array.from(gminaSet).sort().map(g => `<option value="${g}">${g}</option>`).join('');
+      plotCurrent();
+    }
+
+    function plotCurrent(region) {
+      const woj = regionSelector['woj'].value;
+      const powiat = regionSelector['powiat'].value;
+      const gmina = regionSelector['gmina'].value;
+      let rows = wyniki.filter(r =>
+        (!woj || r.Województwo === woj) &&
+        (!powiat || r.Powiat === powiat) &&
+        (!gmina || r.Gmina === gmina)
+      );
+      let votes = candidates.map(cand =>
+        rows.reduce((acc, r) => acc + (parseInt((r[cand] || '0').replace(/\s/g,'')) || 0), 0)
+      );
 
       let candWithVotes = candidates.map((cand, idx) => ({
         name: cand,
@@ -116,7 +178,6 @@
 
       const totalVotes = sortedVotes.reduce((a, b) => a + b, 0);
 
-      // BARPLOT
       if (barChart) barChart.destroy();
       barChart = new Chart(document.getElementById('barplot'), {
         type: 'bar',
@@ -186,12 +247,27 @@
           || selectedRegion.ADM1_PCODE.substring(3);
     }
 
-    function getRegionName(props) {
-      return props.nazwa || props.JPT_NAZWA_ || props.ADM1_PL;
+    function getRegionName(region) {
+      return region.nazwa || region.JPT_NAZWA_ || region.ADM1_PL;
     }
 
-    function getSubregionsData(selectedRegionType) {
-      return selectedRegionType == 'woj' ? regionData['powiat'] : regionData['gmina'];
+    function getSubregionType(regionType) {
+      return regionType === 'woj' ? 'powiat' : 'gmina';
+    }
+
+    function getRegionNameForFiltering(region, regionType) {
+      let name = getRegionName(region);
+      switch (regionType) {
+        case 'woj':
+          return name.toLowerCase();
+        case 'powiat':
+          return name.replace(/^powiat /g, "");
+        case 'gmina':
+          return Array.from(regionSelector[regionType].options)
+                  .map(opt => opt.value)
+                  .filter(v => (v.replace(/^((m\.)|(gm\.)) /g, "") === name.replace(/^((m\.)|(gm\.)) /g, "")))
+                  .pop();
+      }
     }
 
     var map = L.map('map', {
@@ -269,9 +345,8 @@
           map.fitBounds(e.target.getBounds());
 
           // Select in dropdown:
-          const select = document.getElementById('regionSelect');
-          select.value = getRegionName(selectedRegion).toLowerCase();
-          select.dispatchEvent(new Event('change'));
+          regionSelector[selectedRegionType].value = getRegionNameForFiltering(selectedRegion, selectedRegionType)
+          regionSelector[selectedRegionType].dispatchEvent(new Event('change'));
 
           if (layers['powiat']) {
             map.removeLayer(layers['powiat']);
@@ -280,11 +355,11 @@
             map.removeLayer(layers['gmina']);
           }
           
-          const subregionsData = getSubregionsData(selectedRegionType)
+          const subregionType = getSubregionType(selectedRegionType)
           const selectedRegionId = getRegionId(selectedRegion)
           const filteredSubregions = {
-            ...subregionsData,
-            features: subregionsData.features.filter(f =>
+            ...regionData[subregionType],
+            features: regionData[subregionType].features.filter(f =>
               (f.properties.JPT_KOD_JE.startsWith(selectedRegionId))
             )
           };
@@ -305,7 +380,7 @@
             }
           }).addTo(map);
 
-          layers[selectedRegionType] = nextLayer;
+          layers[subregionType] = nextLayer;
         }
 
         function onEachFeature(feature, layer) {
