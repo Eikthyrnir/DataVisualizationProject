@@ -54,44 +54,137 @@
   <div class="container">
     <div id="sidebar">
       <h2 id="region-title">Wybierz region</h2>
-      <canvas id="barplot" height="240"></canvas>
+      <select id="wojewodztwoSelect"></select>
+      <canvas id="barplot" height="320"></canvas>
+      <canvas id="pieplot" height="320"></canvas>
     </div>
     <div id="map"></div>
   </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
-    // 1. Chart.js
+    let wyniki = [];
+    let candidates = [
+      'BARTOSZEWICZ Artur','BIEJAT Magdalena Agnieszka','BRAUN Grzegorz Michał','HOŁOWNIA Szymon Franciszek',
+      'JAKUBIAK Marek','MACIAK Maciej','MENTZEN Sławomir Jerzy','NAWROCKI Karol Tadeusz',
+      'SENYSZYN Joanna','STANOWSKI Krzysztof Jakub','TRZASKOWSKI Rafał Kazimierz',
+      'WOCH Marek Marian','ZANDBERG Adrian Tadeusz'
+    ];
+
     let barChart = null;
-    function showBarplot(region, data) {
-      document.getElementById('region-title').textContent = region;
-      if(barChart) barChart.destroy();
+    let pieChart = null;
+
+    // 1. Загружаем CSV
+    Papa.parse('raw_data/tura_1/wyniki_gl_na_kandydatow_po_wojewodztwach_utf8.csv', {
+      download: true,
+      header: true,
+      delimiter: ';',
+      complete: function(results) {
+        wyniki = results.data.filter(row => row.Województwo); // пропускаем пустые строки
+        // заполняем селектор воеводств
+        const wojSet = new Set(wyniki.map(r=>r.Województwo));
+        const select = document.getElementById('wojewodztwoSelect');
+        select.innerHTML = `<option value="__ALL__">Cała Polska</option>` +
+          Array.from(wojSet).map(w => `<option value="${w}">${w}</option>`).join('');
+        select.addEventListener('change', ()=>plotForRegion(select.value));
+        plotForRegion('__ALL__');
+      }
+    });
+
+    // 2. Функция для агрегации по региону
+    function getVotes(region) {
+      let rows = (region === '__ALL__') ? wyniki : wyniki.filter(r=>r.Województwo===region);
+      // Суммируем по кандидатам
+      let votes = candidates.map(cand =>
+        rows.reduce((acc, r) => acc + (parseInt(r[cand].replace(/\s/g,'') || 0)), 0)
+      );
+      return votes;
+    }
+
+    // 3. Строим barplot и pieplot
+    function plotForRegion(region) {
+      let votes = getVotes(region);
+
+      let candWithVotes = candidates.map((cand, idx) => ({
+        name: cand,
+        value: votes[idx]
+      }));
+      candWithVotes.sort((a, b) => b.value - a.value);
+      const sortedCandidates = candWithVotes.map(obj => obj.name);
+      const sortedVotes = candWithVotes.map(obj => obj.value);
+
+      const totalVotes = sortedVotes.reduce((a, b) => a + b, 0);
+
+      // BARPLOT
+      if (barChart) barChart.destroy();
       barChart = new Chart(document.getElementById('barplot'), {
         type: 'bar',
         data: {
-          labels: data.labels,
+          labels: sortedCandidates,
           datasets: [{
-            label: 'Głosy',
-            data: data.values,
-            borderWidth: 1,
+            data: sortedVotes,
             backgroundColor: [
-              '#2176ae', '#fbb13c', '#f25f5c', '#7bc950', '#623d7c'
-            ],
+              '#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2',
+              '#7f7f7f','#bcbd22','#17becf','#a10028','#fcb900','#2176ae'
+            ]
           }]
         },
         options: {
           indexAxis: 'y',
-          scales: { x: { beginAtZero: true } },
-          plugins: { legend: { display: false } }
+          plugins: {
+            legend: {display: false},
+            title: {display: true, text: `Wyniki kandydatów — ${region === "__ALL__" ? "Polska" : region}`},
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  const val = ctx.parsed.x;
+                  const pct = totalVotes ? (val / totalVotes * 100).toFixed(1) : 0;
+                  return `${val.toLocaleString('pl-PL')} (${pct}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // CIRCLE (PIE) PLOT
+      if (pieChart) pieChart.destroy();
+      pieChart = new Chart(document.getElementById('pieplot'), {
+        type: 'pie',
+        data: {
+          labels: sortedCandidates,
+          datasets: [{
+            data: sortedVotes,
+            backgroundColor: [
+              '#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2',
+              '#7f7f7f','#bcbd22','#17becf','#a10028','#fcb900','#2176ae'
+            ]
+          }]
+        },
+        options: {
+          plugins: {
+            legend: {position: 'right'},
+            title: {display: true, text: `Udział głosów — ${region === "__ALL__" ? "Polska" : region}`},
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  const val = ctx.parsed;
+                  const pct = totalVotes ? (val / totalVotes * 100).toFixed(1) : 0;
+                  return `${val.toLocaleString('pl-PL')} (${pct}%)`;
+                }
+              }
+            }
+          }
         }
       });
     }
 
+    // 2. Карта
     function getRegionName(props) {
       return props.nazwa || props.JPT_NAZWA_ || props.ADM1_PL;
     }
 
-    // 2. Карта
     var map = L.map('map', {
       center: [52.1, 19.4],
       zoom: 6,
@@ -194,20 +287,6 @@
           } else {
             gminyLayer = nextLayer;
           }
-
-          // ------ !!! Barplot demo !!! -------
-          showBarplot(
-            getRegionName(selectedRegion),
-            {
-              labels: ["Kandydat A", "Kandydat B", "Kandydat C", "Inni", "Frekwencja (%)"],
-              values: [
-                selectedRegion.kandA || Math.round(Math.random()*1000000),
-                selectedRegion.kandB || Math.round(Math.random()*1000000),
-                selectedRegion.kandC || Math.round(Math.random()*1000000),
-                selectedRegion.inni  || Math.round(Math.random()*100000)
-              ]
-            }
-          );
         }
 
         function onEachFeature(feature, layer) {
@@ -229,11 +308,6 @@
         }).addTo(map);
       });
 
-    // По умолчанию какой-нибудь барплот-заглушка
-    showBarplot("Województwa", {
-      labels: ["Kandydat A", "Kandydat B", "Kandydat C", "Inni", "Frekwencja (%)"],
-      values: [0, 0, 0, 0, 0]
-    });
   </script>
 </body>
 </html>
