@@ -2,15 +2,92 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8">
-  <title>Mapa Województw Polski – Interaktywna</title>
+  <title>Mapa Województw Polski + Barplot</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style> #map { height: 100vh; width: 100vw; } </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body, html {height:100%; margin:0;}
+    .container {
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+      width: 100vw;
+    }
+    #sidebar {
+      width: 50vw;
+      min-width: 0;
+      max-width: 50vw;
+      padding: 24px 16px 16px 16px;
+      box-sizing: border-box;
+      border-right: 1px solid #eee;
+      background: #fafaff;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      overflow-y: auto;
+    }
+    #map {
+      width: 50vw;
+      min-width: 0;
+      height: 100vh;
+    }
+    @media (max-width: 900px) {
+      .container { flex-direction: column; }
+      #sidebar, #map { width: 100vw; max-width: none; border-right: none; }
+      #map { height: 50vh; }
+    }
+
+    .leaflet-tooltip.custom-tooltip {
+      background: #fff;
+      color: #800024;
+      border-radius: 8px;
+      border: 2px solid #e5e5e5;
+      padding: 8px 18px;
+      font-size: 1.2rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+      font-weight: 600;
+    }
+  </style>
 </head>
 <body>
-  <div id="map"></div>
+  <div class="container">
+    <div id="sidebar">
+      <h2 id="region-title">Wybierz region</h2>
+      <canvas id="barplot" height="240"></canvas>
+    </div>
+    <div id="map"></div>
+  </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
   <script>
+    // 1. Chart.js
+    let barChart = null;
+    function showBarplot(region, data) {
+      document.getElementById('region-title').textContent = region;
+      if(barChart) barChart.destroy();
+      barChart = new Chart(document.getElementById('barplot'), {
+        type: 'bar',
+        data: {
+          labels: data.labels,
+          datasets: [{
+            label: 'Głosy',
+            data: data.values,
+            borderWidth: 1,
+            backgroundColor: [
+              '#2176ae', '#fbb13c', '#f25f5c', '#7bc950', '#623d7c'
+            ],
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          scales: { x: { beginAtZero: true } },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    // 2. Карта
     var map = L.map('map', {
       center: [52.1, 19.4],
       zoom: 6,
@@ -42,39 +119,55 @@
         function highlightFeature(e) {
           var layer = e.target;
           layer.setStyle({
-            fillColor: "#FFEE88",
-            fillOpacity: 0.7
+            fillColor: "#a10028",
+            fillOpacity: 1
           });
+
+          // Get center of the region (bounds center is simple and works well for Poland)
+          var center = layer.getBounds().getCenter();
+
+          const props = layer.feature.properties;
+
+          // Add custom tooltip at center
+          layer.bindTooltip(
+            props.nazwa || props.JPT_NAZWA_ || props.ADM1_PL,
+            {
+              permanent: true,
+              direction: 'center',
+              className: 'custom-tooltip',
+              offset: [0,0],
+              interactive: false
+            }
+          ).openTooltip(center);
         }
 
-        function resetHighlight(e) {
-          wojewodztwaLayer.resetStyle(e.target);
+        function resetHighlight(e, layer) {
+          layer.resetStyle(e.target);
+          e.target.unbindTooltip();
         }
 
         function zoomToFeature(e) {
-          var woj = e.target.feature;
+          var selectedRegion = e.target.feature;
           map.fitBounds(e.target.getBounds());
 
-          console.log(woj.properties.ADM1_PL)
-
-          // Очищаем старый слой powiatów
           if (powiatyLayer) {
             map.removeLayer(powiatyLayer);
           }
+          if (gminyLayer) {
+            map.removeLayer(gminyLayer);
+          }
 
-          // Фильтруем powiaty, принадлежащие этому województwu
-          // Зависит от вашей структуры geojson! 
-          // Например, если поле 'wojewodztwo_id' или TERYT
-          const wojId = woj.properties.ADM1_PCODE
-          const filteredPowiaty = {
-            ...powiatyData,
-            features: powiatyData.features.filter(f =>
-              // например, если powiat.properties.wojewodztwo_id == wojId
-              (f.properties.JPT_KOD_JE.startsWith(wojId.substring(3)))    // замените на ваше реальное имя поля
+          const selectedRegionId = selectedRegion.properties.JPT_KOD_JE 
+              || selectedRegion.properties.ADM1_PCODE.substring(3);
+          const subregionsData = selectedRegionId.length == 2 ? powiatyData : gminyData;
+          const filteredSubregions = {
+            ...subregionsData,
+            features: subregionsData.features.filter(f =>
+              (f.properties.JPT_KOD_JE.startsWith(selectedRegionId))
             )
           };
 
-          powiatyLayer = L.geoJson(filteredPowiaty, {
+          nextLayer = L.geoJson(filteredSubregions, {
             style: {
               color: "#0066cc",
               weight: 1.5,
@@ -83,28 +176,40 @@
             },
             onEachFeature: function(feature, layer) {
               layer.on({
-                mouseover: function(e){
-                  e.target.setStyle({
-                    fillColor: "#fcb900",
-                    fillOpacity: 0.8
-                  });
-                },
-                mouseout: function(e){
-                  powiatyLayer.resetStyle(e.target);
-                },
-                click: function(e){
-                  map.fitBounds(e.target.getBounds());
-                  console.log("Wybrano powiat: " + e.target.feature.properties.JPT_NAZWA_);
-                }
+                mouseover: highlightFeature,
+                mouseout: (e) => resetHighlight(e, nextLayer),
+                click: zoomToFeature
               });
             }
-          }).addTo(map);
+          }).addTo(map);;
+
+          if (selectedRegionId.length == 2) {
+            powiatyLayer = nextLayer;
+          } else {
+            gminyLayer = nextLayer;
+          }
+
+          // ------ !!! Barplot demo !!! -------
+          const props = woj.properties;
+          showBarplot(
+            props.nazwa || props.name || "Województwo",
+            {
+              labels: ["Kandydat A", "Kandydat B", "Kandydat C", "Inni", "Frekwencja (%)"],
+              values: [
+                props.kandA || Math.round(Math.random()*1000000),
+                props.kandB || Math.round(Math.random()*1000000),
+                props.kandC || Math.round(Math.random()*1000000),
+                props.inni  || Math.round(Math.random()*100000),
+                props.frekwencja || (40 + Math.round(Math.random()*30))
+              ]
+            }
+          );
         }
 
         function onEachFeature(feature, layer) {
           layer.on({
             mouseover: highlightFeature,
-            mouseout: resetHighlight,
+            mouseout: (e) => resetHighlight(e, wojewodztwaLayer),
             click: zoomToFeature
           });
         }
@@ -119,6 +224,12 @@
           onEachFeature: onEachFeature
         }).addTo(map);
       });
+
+    // По умолчанию какой-нибудь барплот-заглушка
+    showBarplot("Województwa", {
+      labels: ["Kandydat A", "Kandydat B", "Kandydat C", "Inni", "Frekwencja (%)"],
+      values: [0, 0, 0, 0, 0]
+    });
   </script>
 </body>
 </html>
