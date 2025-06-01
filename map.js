@@ -1,3 +1,86 @@
+let currentMode = 'wyniki'; // or 'frekwencja'
+document.getElementById('wynikiBtn').onclick = () => setMode('wyniki');
+document.getElementById('frekwencjaBtn').onclick = () => setMode('frekwencja');
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('wynikiBtn').classList.toggle('selected', mode === 'wyniki');
+  document.getElementById('frekwencjaBtn').classList.toggle('selected', mode === 'frekwencja');
+
+  document.getElementById('barplot').style.display = mode === 'wyniki' ? 'block' : 'none';
+  document.getElementById('pieplot').style.display = mode === 'wyniki' ? 'block' : 'none';
+
+  colorMapRegions();
+}
+
+function colorMapRegions() {
+  const subregionType = getSubregionType(selectedRegionType);
+  if (!layers[subregionType]) return;
+
+  const frekwencjiByLayer = {}
+  let maxFreq = 0.0;
+  let minFreq = 1.0;
+  layers[subregionType].eachLayer(l => {
+    const region = l.feature.properties;
+    const regionNameForFiltering = getRegionNameForFiltering(region);
+
+    const {uprawnionych, wydano} = frekwencjaPerRegion[subregionType][regionNameForFiltering];
+    const freq = uprawnionych > 0 ? wydano / uprawnionych : 0;
+    frekwencjiByLayer[regionNameForFiltering] = freq;
+    maxFreq = Math.max(maxFreq, freq);
+    minFreq = Math.min(minFreq, freq);
+  })
+
+  layers[subregionType].eachLayer(layer => {
+    let region = layer.feature.properties;
+    if (currentMode === 'frekwencja') {
+      let regionNameForFiltering = getRegionNameForFiltering(region);
+
+      const freq = frekwencjiByLayer[regionNameForFiltering];
+
+      layer.setStyle({ fillColor: getFreqColor(freq, minFreq, maxFreq), fillOpacity: 0.9 });
+      layer.bindTooltip(
+        `${regionNameForFiltering}<br>Frekwencja: ${(freq*100).toFixed(1)}%`,
+        { className: 'custom-tooltip', direction: 'center', permanent: false }
+      );
+    } else {
+      layer.setStyle({
+        fillColor: "#dddddd",
+        fillOpacity: 0.6
+      });
+      layer.unbindTooltip();
+    }
+  });
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function hexToRgb(hex) {
+  hex = hex.replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(x=>x+x).join('');
+  const num = parseInt(hex, 16);
+  return [num >> 16, (num >> 8) & 0xFF, num & 0xFF];
+}
+
+function rgbToHex([r, g, b]) {
+  return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
+function getFreqColor(freq, min, max) {
+  let t = (freq - min) / (max - min)
+  const rgb1 = hexToRgb('#FFFFFF');
+  const rgb2 = hexToRgb('#a10028');
+  const rgb = [
+    Math.round(lerp(rgb1[0], rgb2[0], t)),
+    Math.round(lerp(rgb1[1], rgb2[1], t)),
+    Math.round(lerp(rgb1[2], rgb2[2], t))
+  ];
+  return rgbToHex(rgb);
+}
+
+
 function getRegionId(region) {
   return region.JPT_KOD_JE
       || selectedRegion.ADM1_PCODE.substring(3);
@@ -7,12 +90,26 @@ function getRegionName(region) {
   return region.nazwa || region.JPT_NAZWA_ || region.ADM1_PL;
 }
 
-function getSubregionType(regionType) {
-  return regionType === 'woj' ? 'powiat' : 'gmina';
+function getRegionType(region) {
+   return region.RODZAJ || 'woj';
 }
 
-function getRegionNameForFiltering(region, regionType) {
+function getSubregionType(regionType) {
+  switch (regionType) {
+    case 'woj':
+      return 'powiat';
+    case 'powiat':
+      return 'gmina';
+    case 'gmina':
+      return 'gmina';
+    default:
+      return 'woj';
+  }
+}
+
+function getRegionNameForFiltering(region) {
   let name = getRegionName(region);
+  const regionType = getRegionType(region);
   switch (regionType) {
     case 'woj':
       return name.toLowerCase();
@@ -97,11 +194,11 @@ fetch('contours_data/pol_admbnda_adm1_gov_v02_20220414.json')
 
     function zoomToFeature(e) {
       selectedRegion = e.target.feature.properties;
-      selectedRegionType = selectedRegion.RODZAJ || 'woj'
+      selectedRegionType = getRegionType(selectedRegion);
       map.fitBounds(e.target.getBounds());
 
       // Select in dropdown:
-      regionSelector[selectedRegionType].value = getRegionNameForFiltering(selectedRegion, selectedRegionType)
+      regionSelector[selectedRegionType].value = getRegionNameForFiltering(selectedRegion)
       regionSelector[selectedRegionType].dispatchEvent(new Event('change'));
 
       if (layers['powiat']) {

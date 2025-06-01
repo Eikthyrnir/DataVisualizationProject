@@ -1,4 +1,3 @@
-// config.js
 const CANDIDATES = [
   'BARTOSZEWICZ Artur','BIEJAT Magdalena Agnieszka','BRAUN Grzegorz Michał','HOŁOWNIA Szymon Franciszek',
   'JAKUBIAK Marek','MACIAK Maciej','MENTZEN Sławomir Jerzy','NAWROCKI Karol Tadeusz',

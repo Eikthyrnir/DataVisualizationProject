@@ -10,6 +10,10 @@
 <body>
   <div class="container">
     <div id="sidebar">
+      <div id="toggle-row" style="margin: 16px 0;">
+        <button id="wynikiBtn" class="toggle-btn selected">Wyniki</button>
+        <button id="frekwencjaBtn" class="toggle-btn">Frekwencja</button>
+      </div>
       <div class="select-row">
         <h2 id="region-title">Wybierz region</h2>
         <label>Województwo:
@@ -27,11 +31,13 @@
     </div>
     <div id="map"></div>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="config.js"></script>
   <script src="charts.js"></script>
+  <script src="data.js"></script>
   <script src="map.js"></script>
 </body>
 </html>

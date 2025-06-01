@@ -28,7 +28,8 @@ function getColumnName(regionType) {
   }
 }
 
-// 1. Загружаем CSV
+let frekwencjaPerRegion = null;
+
 Papa.parse('raw_data/tura_1/wyniki_gl_na_kandydatow_po_gminach_utf8.csv', {
   download: true,
   header: true,
@@ -42,6 +43,12 @@ Papa.parse('raw_data/tura_1/wyniki_gl_na_kandydatow_po_gminach_utf8.csv', {
     regionSelector['gmina'].addEventListener('change', plotCurrent);
 
     plotCurrent();
+
+    frekwencjaPerRegion = {
+      woj: getFrekwencjaSum("Województwo"),
+      powiat: getFrekwencjaSum("Powiat"),
+      gmina: getFrekwencjaSum("Gmina"),
+    }
   }
 });
 
@@ -133,7 +140,6 @@ function plotCurrent(region) {
     }
   });
 
-  // CIRCLE (PIE) PLOT
   if (pieChart) pieChart.destroy();
   pieChart = new Chart(document.getElementById('pieplot'), {
     type: 'pie',
