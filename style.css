@@ -1,0 +1,42 @@
+body, html {height:100%; margin:0;}
+.container {
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+  width: 100vw;
+}
+#sidebar {
+  width: 50vw;
+  min-width: 0;
+  max-width: 50vw;
+  padding: 24px 16px 16px 16px;
+  box-sizing: border-box;
+  border-right: 1px solid #eee;
+  background: #fafaff;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow-y: auto;
+}
+#map {
+  width: 50vw;
+  min-width: 0;
+  height: 100vh;
+}
+@media (max-width: 900px) {
+  .container { flex-direction: column; }
+  #sidebar, #map { width: 100vw; max-width: none; border-right: none; }
+  #map { height: 50vh; }
+}
+
+.leaflet-tooltip.custom-tooltip {
+  background: #fff;
+  color: #800024;
+  border-radius: 8px;
+  border: 2px solid #e5e5e5;
+  padding: 8px 18px;
+  font-size: 1.2rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  font-family: 'Segoe UI', 'Arial', sans-serif;
+  font-weight: 600;
+}

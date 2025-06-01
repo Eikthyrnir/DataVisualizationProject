@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <title>Mapa Województw Polski + Barplot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="sidebar">
+      <div class="select-row">
+        <h2 id="region-title">Wybierz region</h2>
+        <label>Województwo:
+          <select id="wojewodztwoSelect"></select>
+        </label>
+        <label>Powiat:
+          <select id="powiatSelect"></select>
+        </label>
+        <label>Gmina:
+          <select id="gminaSelect"></select>
+        </label>
+      </div>
+      <canvas id="barplot" height="320"></canvas>
+      <canvas id="pieplot" height="320"></canvas>
+    </div>
+    <div id="map"></div>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="config.js"></script>
+  <script src="charts.js"></script>
+  <script src="map.js"></script>
+</body>
+</html>
