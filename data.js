@@ -9,3 +9,13 @@ function getFrekwencjaSum(regionType) {
     }
     return sums;
 }
+
+let wyniki = [];
+let candidates = [
+  'BARTOSZEWICZ Artur','BIEJAT Magdalena Agnieszka','BRAUN Grzegorz Michał','HOŁOWNIA Szymon Franciszek',
+  'JAKUBIAK Marek','MACIAK Maciej','MENTZEN Sławomir Jerzy','NAWROCKI Karol Tadeusz',
+  'SENYSZYN Joanna','STANOWSKI Krzysztof Jakub','TRZASKOWSKI Rafał Kazimierz',
+  'WOCH Marek Marian','ZANDBERG Adrian Tadeusz'
+];
+
+let frekwencjaPerRegion = null;

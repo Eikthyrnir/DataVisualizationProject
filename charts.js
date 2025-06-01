@@ -1,11 +1,3 @@
-let wyniki = [];
-let candidates = [
-  'BARTOSZEWICZ Artur','BIEJAT Magdalena Agnieszka','BRAUN Grzegorz Michał','HOŁOWNIA Szymon Franciszek',
-  'JAKUBIAK Marek','MACIAK Maciej','MENTZEN Sławomir Jerzy','NAWROCKI Karol Tadeusz',
-  'SENYSZYN Joanna','STANOWSKI Krzysztof Jakub','TRZASKOWSKI Rafał Kazimierz',
-  'WOCH Marek Marian','ZANDBERG Adrian Tadeusz'
-];
-
 let barChart = null;
 let pieChart = null;
 
@@ -14,21 +6,6 @@ const regionSelector = {
   powiat: document.getElementById('powiatSelect'),
   gmina: document.getElementById('gminaSelect'),
 };
-
-function getColumnName(regionType) {
-  switch (regionType) {
-    case 'powiat':
-      return 'Powiat';
-    case 'gmina':
-      return 'Gmina';
-    case 'woj':
-    //fallthrought
-    default:
-      return 'Województwo';
-  }
-}
-
-let frekwencjaPerRegion = null;
 
 Papa.parse('raw_data/tura_1/wyniki_gl_na_kandydatow_po_gminach_utf8.csv', {
   download: true,
