@@ -7,7 +7,12 @@ const regionSelector = {
   gmina: document.getElementById('gminaSelect'),
 };
 
-Papa.parse('raw_data/tura_1/wyniki_gl_na_kandydatow_po_gminach_utf8.csv', {
+const isTura2 = window.location.pathname.includes('index2.html');
+let data_location = isTura2
+    ? 'raw_data/tura_2/wyniki_gl_na_kandydatow_po_gminach_w_drugiej_turze_utf8.csv'
+    : 'raw_data/tura_1/wyniki_gl_na_kandydatow_po_gminach_utf8.csv';
+
+Papa.parse(data_location, {
   download: true,
   header: true,
   delimiter: ';',
@@ -85,6 +90,7 @@ function plotCurrent(region) {
   const sortedVotes = candWithVotes.map(obj => obj.value);
 
   const totalVotes = sortedVotes.reduce((a, b) => a + b, 0);
+  console.log(region);
 
   if (barChart) barChart.destroy();
   barChart = new Chart(document.getElementById('barplot'), {
@@ -94,7 +100,7 @@ function plotCurrent(region) {
       datasets: [{
         data: sortedVotes,
         backgroundColor: [
-          '#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2',
+          '#ff7f0e', '#1f77b4', '#2ca02c','#d62728','#9467bd','#8c564b','#e377c2',
           '#7f7f7f','#bcbd22','#17becf','#a10028','#fcb900','#2176ae'
         ]
       }]
@@ -103,7 +109,7 @@ function plotCurrent(region) {
       indexAxis: 'y',
       plugins: {
         legend: {display: false},
-        title: {display: true, text: `Wyniki kandydatów — ${region === "__ALL__" ? "Polska" : region}`},
+        title: {display: true, text: `Wykres słupkowy - wyniki`},
         tooltip: {
           callbacks: {
             label: function(ctx) {
@@ -125,7 +131,7 @@ function plotCurrent(region) {
       datasets: [{
         data: sortedVotes,
         backgroundColor: [
-          '#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2',
+          '#ff7f0e', '#1f77b4', '#2ca02c','#d62728','#9467bd','#8c564b','#e377c2',
           '#7f7f7f','#bcbd22','#17becf','#a10028','#fcb900','#2176ae'
         ]
       }]
@@ -133,7 +139,7 @@ function plotCurrent(region) {
     options: {
       plugins: {
         legend: {position: 'right'},
-        title: {display: true, text: `Udział głosów — ${region === "__ALL__" ? "Polska" : region}`},
+        title: {display: true, text: `Wykres kołowy - wyniki`},
         tooltip: {
           callbacks: {
             label: function(ctx) {

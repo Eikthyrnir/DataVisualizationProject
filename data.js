@@ -11,7 +11,9 @@ function getFrekwencjaSum(regionType) {
 }
 
 let wyniki = [];
-let candidates = [
+let candidates = isTura2 ?
+    ['NAWROCKI Karol Tadeusz', 'TRZASKOWSKI Rafał Kazimierz']
+    : [
   'BARTOSZEWICZ Artur','BIEJAT Magdalena Agnieszka','BRAUN Grzegorz Michał','HOŁOWNIA Szymon Franciszek',
   'JAKUBIAK Marek','MACIAK Maciej','MENTZEN Sławomir Jerzy','NAWROCKI Karol Tadeusz',
   'SENYSZYN Joanna','STANOWSKI Krzysztof Jakub','TRZASKOWSKI Rafał Kazimierz',

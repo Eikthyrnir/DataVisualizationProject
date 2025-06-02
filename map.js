@@ -24,6 +24,7 @@ function colorMapRegions() {
       const freq = frekwencjiByLayer[regionNameForFiltering];
 
       layer.setStyle({ fillColor: getFreqColor(freq, minFreq, maxFreq), fillOpacity: 0.9 });
+      layer.unbindTooltip(); // Ensure old tooltip is removed
       layer.bindTooltip(
         `${regionNameForFiltering}<br>Frekwencja: ${(freq*100).toFixed(1)}%`,
         { className: 'custom-tooltip', direction: 'center', permanent: false }
@@ -108,29 +109,44 @@ fetch('contours_data/pol_admbnda_adm1_gov_v02_20220414.json')
   });
 
 function highlightFeature(e) {
-  var layer = e.target;
+  const layer = e.target;
   layer.setStyle({
     fillColor: "#000000",
     fillOpacity: 1
   });
 
-  // Get center of the region (bounds center is simple and works well for Poland)
-  var center = layer.getBounds().getCenter();
-
   const props = layer.feature.properties;
 
-  // Add custom tooltip at center
-  layer.bindTooltip(
-    getRegionName(props),
-    {
-      permanent: true,
-      direction: 'center',
-      className: 'custom-tooltip',
-      offset: [0,0],
-      interactive: false
-    }
-  ).openTooltip(center);
+  if (currentMode === 'frekwencja') {
+    const regionName = getRegionNameForFiltering(props);
+    const { uprawnionych, wydano } = frekwencjaPerRegion[getRegionType(props)][regionName];
+    const freq = uprawnionych > 0 ? wydano / uprawnionych : 0;
+
+    layer.bindTooltip(
+        `${regionName}<br>Frekwencja: ${(freq * 100).toFixed(1)}%`,
+        {
+          permanent: false,
+          direction: 'center',
+          className: 'custom-tooltip',
+          offset: [0, 0],
+          interactive: false
+        }
+    ).openTooltip();
+  } else {
+    const center = layer.getBounds().getCenter();
+    layer.bindTooltip(
+        getRegionName(props),
+        {
+          permanent: true,
+          direction: 'center',
+          className: 'custom-tooltip',
+          offset: [0, 0],
+          interactive: false
+        }
+    ).openTooltip(center);
+  }
 }
+
 
 function resetHighlight(e, layer) {
   layer.resetStyle(e.target);
@@ -182,6 +198,7 @@ function zoomToFeature(e) {
   }).addTo(map);
 
   layers[subregionType] = nextLayer;
+  colorMapRegions();
 }
 
 function layerStylingFunction(feature, baseColor, frekwencjiByLayer, minFreq, maxFreq) {
